@@ -16,18 +16,49 @@ def validate_subscriber_file(input_csv, company_id):
     # Step 3: Read the input CSV
     df = pd.read_csv(output_csv)
 
-    # Step 4: Create new CSV with inserted column
-    output_inserted_csv = os.path.join(company_id, "original_subscribers_columnA_inserted.csv")
-
-    # Step 5: Insert OrigRowNum column to the left of column A
+    # Step 4: Insert OrigRowNum column to the left of column A
     # Create sequential numbers for all data rows (excluding header)
     active_subscribers = len(df)  # Total number of data rows
     df.insert(0, "OrigRowNum", range(1, active_subscribers + 1))
 
-    # Step 6: Save the modified DataFrame to original_subscribers_columnA_inserted.csv
+    # Step 5: Save the modified DataFrame to original_subscribers_columnA_inserted.csv
+    output_inserted_csv = os.path.join(company_id, "original_subscribers_columnA_inserted.csv")
     df.to_csv(output_inserted_csv, index=False)
 
-    print(f"Processing complete. Files saved in {company_id}/")
+    # Step 6: Read the CSV with OrigRowNum for further processing
+    df_inserted = pd.read_csv(output_inserted_csv)
+
+    # Step 7: Validate required columns (case-insensitive, excluding OrigRowNum)
+    required_columns = [
+        "customer", "lat", "lon", "address", "city", "state", "zip",
+        "download", "upload", "voip_lines_quantity", "business_customer", "technology"
+    ]
+    input_columns = df_inserted.columns.str.lower().tolist()  # Convert input column names to lowercase for comparison
+    missing_columns = [col for col in required_columns if col not in input_columns]
+
+    if missing_columns:
+        print(f"Error: The following required columns are missing: {', '.join(missing_columns)}")
+        sys.exit(1)
+
+    # Step 8: Create new CSV with cleaned column titles, including OrigRowNum
+    output_cleantitles_csv = os.path.join(company_id, "original_subscribers_cleantitles.csv")
+    
+    # Define output columns including OrigRowNum
+    output_columns = ["OrigRowNum"] + required_columns
+    
+    # Map original column names to standardized lowercase names
+    column_mapping = {col: col.lower() for col in df_inserted.columns if col.lower() in required_columns or col == "OrigRowNum"}
+    
+    # Select and reorder columns to match output_columns order
+    cleaned_df = df_inserted[list(column_mapping.keys())].rename(columns=column_mapping)[output_columns]
+    
+    # Save the cleaned DataFrame to original_subscribers_cleantitles.csv
+    cleaned_df.to_csv(output_cleantitles_csv, index=False)
+
+    print(f"Processing complete. Files saved in {company_id}/:")
+    print(f"- original_subscribers.csv (original copy)")
+    print(f"- original_subscribers_columnA_inserted.csv (with OrigRowNum)")
+    print(f"- original_subscribers_cleantitles.csv (cleaned column titles with OrigRowNum)")
 
 if __name__ == "__main__":
     # Check for correct command-line arguments
