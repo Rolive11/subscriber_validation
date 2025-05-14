@@ -1,5 +1,6 @@
 # Subscriber Validation Repository
-# This repository contains tools and documentation for validating subscriber CSV files.
+
+This repository contains tools and documentation for validating subscriber CSV files.
 
 ## Flowchart for Step 1 Validation
 ```mermaid
