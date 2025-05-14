@@ -1,6 +1,6 @@
 # How-To Guide for Subscriber Validation Script (vs.py)
 
-This guide provides step-by-step instructions for using the `vs.py` Python script, which processes subscriber CSV files according to the flowchart in the Subscriber Validation Repository. The script creates a directory, copies the input CSV, and adds a new column (`OrigRowNum`) to track the original row order for traceability.
+This guide provides step-by-step instructions for using the `vs.py` Python script, which processes subscriber CSV files according to the flowchart in the Subscriber Validation Repository. The script creates a directory, copies the input CSV, adds a new column (`OrigRowNum`) to track the original row order for traceability, and creates a cleaned version of the CSV with standardized column titles.
 
 ## Prerequisites
 
@@ -57,11 +57,12 @@ To avoid conflicts with other Python projects, consider using a virtual environm
 
 ### 4. Input CSV File
 - Prepare a CSV file (e.g., `subscribers.csv`) with the following structure:
-  - **12 columns** with exact, case-sensitive headers (in order):
+  - **12 columns** with exact, case-insensitive headers (in any order):
     ```
     customer,lat,lon,address,city,state,zip,download,upload,voip_lines_quantity,business_customer,technology
     ```
   - The `customer` column may have missing values, but other columns may contain data.
+  - The CSV may include additional columns, which will be ignored in the cleaned output.
 - Ensure the CSV file is accessible and readable from the directory where you’ll run the script.
 
 ## Script Overview
@@ -71,8 +72,11 @@ The `vs.py` script performs the following tasks:
 3. Reads the CSV and inserts a new column, `OrigRowNum`, as the first column.
 4. Populates `OrigRowNum` with sequential numbers (starting from 1 in row 2) for all data rows to enable traceability.
 5. Saves the modified CSV as `original_subscribers_columnA_inserted.csv` in the `company_id` directory.
+6. Validates that all required columns (`customer`, `lat`, `lon`, `address`, `city`, `state`, `zip`, `download`, `upload`, `voip_lines_quantity`, `business_customer`, `technology`) are present in the CSV, ignoring case.
+7. Creates a new CSV, `original_subscribers_cleantitles.csv`, using `original_subscribers_columnA_inserted.csv`, with only the required columns in the specified order and standardized lowercase titles.
+8. Saves `original_subscribers_cleantitles.csv` in the `company_id` directory.
 
-The `OrigRowNum` column allows you to sort the file later to reconstruct the original row order, even after modifications.
+The `OrigRowNum` column allows you to sort the file later to reconstruct the original row order, even after modifications. The `original_subscribers_cleantitles.csv` file ensures standardized, lowercase column titles for consistency in downstream processing.
 
 ## How to Run the Script
 
@@ -97,18 +101,46 @@ The `OrigRowNum` column allows you to sort the file later to reconstruct the ori
        # Step 3: Read the input CSV
        df = pd.read_csv(output_csv)
 
-       # Step 4: Create new CSV with inserted column
-       output_inserted_csv = os.path.join(company_id, "original_subscribers_columnA_inserted.csv")
-
-       # Step 5: Insert OrigRowNum column to the left of column A
+       # Step 4: Insert OrigRowNum column to the left of column A
        # Create sequential numbers for all data rows (excluding header)
        active_subscribers = len(df)  # Total number of data rows
        df.insert(0, "OrigRowNum", range(1, active_subscribers + 1))
 
-       # Step 6: Save the modified DataFrame to original_subscribers_columnA_inserted.csv
+       # Step 5: Save the modified DataFrame to original_subscribers_columnA_inserted.csv
+       output_inserted_csv = os.path.join(company_id, "original_subscribers_columnA_inserted.csv")
        df.to_csv(output_inserted_csv, index=False)
 
-       print(f"Processing complete. Files saved in {company_id}/")
+       # Step 6: Read the CSV with OrigRowNum for further processing
+       df_inserted = pd.read_csv(output_inserted_csv)
+
+       # Step 7: Validate required columns (case-insensitive)
+       required_columns = [
+           "customer", "lat", "lon", "address", "city", "state", "zip",
+           "download", "upload", "voip_lines_quantity", "business_customer", "technology"
+       ]
+       input_columns = df_inserted.columns.str.lower().tolist()  # Convert input column names to lowercase for comparison
+       missing_columns = [col for col in required_columns if col not in input_columns]
+
+       if missing_columns:
+           print(f"Error: The following required columns are missing: {', '.join(missing_columns)}")
+           sys.exit(1)
+
+       # Step 8: Create new CSV with cleaned column titles
+       output_cleantitles_csv = os.path.join(company_id, "original_subscribers_cleantitles.csv")
+       
+       # Map original column names to standardized lowercase names
+       column_mapping = {col: col.lower() for col in df_inserted.columns if col.lower() in required_columns}
+       # Select and reorder columns to match required_columns order, including OrigRowNum
+       cleaned_df = df_inserted[list(column_mapping.keys()) + ["OrigRowNum"]].rename(columns=column_mapping)
+       cleaned_df = cleaned_df[["OrigRowNum"] + required_columns]  # Reorder with OrigRowNum first
+       
+       # Save the cleaned DataFrame to original_subscribers_cleantitles.csv
+       cleaned_df.to_csv(output_cleantitles_csv, index=False)
+
+       print(f"Processing complete. Files saved in {company_id}/:")
+       print(f"- original_subscribers.csv (original copy)")
+       print(f"- original_subscribers_columnA_inserted.csv (with OrigRowNum)")
+       print(f"- original_subscribers_cleantitles.csv (cleaned column titles with OrigRowNum)")
 
    if __name__ == "__main__":
        # Check for correct command-line arguments
@@ -150,23 +182,28 @@ python3 vs.py "path/to/your_input.csv" "company_id"
 ### Step 4: Verify Output
 After running the script, check the following:
 1. A directory named `company_id` (e.g., `acme_corp`) is created in the same directory as `vs.py`.
-2. Inside `company_id`, two files are created:
+2. Inside `company_id`, three files are created:
    - `original_subscribers.csv`: A copy of the input CSV.
-   - `original_subscribers_columnA_inserted.csv`: The modified CSV with a new `OrigRowNum` column.
-3. Open `original_subscribers_columnA_inserted.csv` to verify:
+   - `original_subscribers_columnA_inserted.csv`: The input CSV with a new `OrigRowNum` column.
+   - `original_subscribers_cleantitles.csv`: A CSV with standardized lowercase column titles in the specified order (`OrigRowNum`, `customer`, `lat`, `lon`, etc.), created from `original_subscribers_columnA_inserted.csv`.
+3. Open `original_subscribers_cleantitles.csv` to verify:
    - The first column is `OrigRowNum` with the header in row 1.
    - Rows 2 and beyond have sequential numbers (1, 2, 3, ...) in the `OrigRowNum` column.
-   - The original 12 columns follow, starting with `customer`.
+   - The next 12 columns are `customer`, `lat`, `lon`, `address`, `city`, `state`, `zip`, `download`, `upload`, `voip_lines_quantity`, `business_customer`, `technology` (all lowercase).
+4. Open `original_subscribers_columnA_inserted.csv` to verify:
+   - The first column is `OrigRowNum` with the header in row 1.
+   - Rows 2 and beyond have sequential numbers (1, 2, 3, ...) in the `OrigRowNum` column.
+   - The original columns (including any extra columns) follow, starting with `customer`.
 
 ## Expected Input and Output
 
 ### Input CSV Example
-Suppose your input CSV (`subscribers.csv`) looks like this:
+Suppose your input CSV (`subscribers.csv`) looks like this, with mixed case and extra columns:
 ```
-customer,lat,lon,address,city,state,zip,download,upload,voip_lines_quantity,business_customer,technology
-John Doe,40.7128,-74.0060,123 Main St,New York,NY,10001,100,20,2,Yes,Fiber
-,34.0522,-118.2437,456 Oak Ave,Los Angeles,CA,90001,50,10,1,No,DSL
-Jane Smith,41.8781,-87.6298,789 Pine Rd,Chicago,IL,60601,200,50,0,Yes,Fiber
+CUSTOMER,LAT,LON,ADDRESS,CITY,STATE,ZIP,EXTRA_COL,DOWNLOAD,UPLOAD,VOIP_LINES_QUANTITY,BUSINESS_CUSTOMER,TECHNOLOGY,ANOTHER_COL
+John Doe,40.7128,-74.0060,123 Main St,New York,NY,10001,Extra1,100,20,2,Yes,Fiber,Extra2
+,34.0522,-118.2437,456 Oak Ave,Los Angeles,CA,90001,Extra3,50,10,1,No,DSL,Extra4
+Jane Smith,41.8781,-87.6298,789 Pine Rd,Chicago,IL,60601,Extra5,200,50,0,Yes,Fiber,Extra6
 ```
 
 ### Output Directory Structure
@@ -175,8 +212,15 @@ After running:
 python3 vs.py "subscribers.csv" "acme_corp"
 ```
 The `acme_corp` directory will contain:
-- `original_subscribers.csv`: Identical to the input CSV.
-- `original_subscribers_columnA_inserted.csv`, which looks like:
+- `original_subscribers.csv`: Identical to the input CSV, including all columns (e.g., `EXTRA_COL`, `ANOTHER_COL`).
+- `original_subscribers_columnA_inserted.csv`:
+  ```
+  OrigRowNum,CUSTOMER,LAT,LON,ADDRESS,CITY,STATE,ZIP,EXTRA_COL,DOWNLOAD,UPLOAD,VOIP_LINES_QUANTITY,BUSINESS_CUSTOMER,TECHNOLOGY,ANOTHER_COL
+  1,John Doe,40.7128,-74.0060,123 Main St,New York,NY,10001,Extra1,100,20,2,Yes,Fiber,Extra2
+  2,,34.0522,-118.2437,456 Oak Ave,Los Angeles,CA,90001,Extra3,50,10,1,No,DSL,Extra4
+  3,Jane Smith,41.8781,-87.6298,789 Pine Rd,Chicago,IL,60601,Extra5,200,50,0,Yes,Fiber,Extra6
+  ```
+- `original_subscribers_cleantitles.csv`:
   ```
   OrigRowNum,customer,lat,lon,address,city,state,zip,download,upload,voip_lines_quantity,business_customer,technology
   1,John Doe,40.7128,-74.0060,123 Main St,New York,NY,10001,100,20,2,Yes,Fiber
@@ -187,20 +231,24 @@ The `acme_corp` directory will contain:
 ### Notes
 - The `OrigRowNum` column ensures every row (including those with missing `customer` values) is numbered sequentially.
 - The script overwrites the `company_id` directory if it exists, so any previous files in that directory will be deleted.
-- The script does not yet validate the CSV headers (e.g., for case sensitivity or correct spelling). Future updates will include this error handling.
+- The script validates that all required columns are present (case-insensitive). If any are missing, it exits with an error.
+- The `original_subscribers_cleantitles.csv` file is created from `original_subscribers_columnA_inserted.csv`, ensuring the `OrigRowNum` column is included and all required columns have standardized lowercase titles in the specified order.
+- Extra columns in the input CSV are preserved in `original_subscribers.csv` and `original_subscribers_columnA_inserted.csv` but excluded from `original_subscribers_cleantitles.csv`.
 
 ## Troubleshooting
 - **Error: "No module named 'pandas'"**
   - Install `pandas` using `pip install pandas`.
 - **Error: "Input file does not exist"**
   - Ensure the CSV file path is correct and accessible. Use quotes around the path if it contains spaces.
+- **Error: "The following required columns are missing"**
+  - Verify that all required columns (`customer`, `lat`, etc.) are present in the input CSV, regardless of case.
 - **No output directory created**
   - Check if the script ran successfully. Ensure you have write permissions in the directory where `vs.py` is located.
 - **Unexpected CSV output**
-  - Verify the input CSV has the expected 12 columns. If issues persist, check the CSV for formatting errors (e.g., missing headers, extra commas).
+  - Verify the input CSV includes the required columns. If issues persist, check the CSV for formatting errors (e.g., missing headers, extra commas).
 
 ## Next Steps
-- **Header Validation**: Future updates will include checks for case-sensitive, correctly spelled headers (`customer`, `lat`, etc.).
+- **Header Validation**: The script currently checks for case-insensitive headers. Future updates may enforce exact spelling and case for stricter validation.
 - **Error Handling**: Additional error handling will be added for malformed CSVs, empty files, or invalid `company_id` values.
 - **Sorting**: The `OrigRowNum` column can be used to sort modified CSVs back to their original order in future processing steps.
 
