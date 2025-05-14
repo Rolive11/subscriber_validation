@@ -28,6 +28,9 @@ def validate_subscriber_file(input_csv, company_id):
     # Step 6: Read the CSV with OrigRowNum for further processing
     df_inserted = pd.read_csv(output_inserted_csv)
 
+    # Debugging: Print columns in df_inserted
+    print(f"Columns in original_subscribers_columnA_inserted.csv: {df_inserted.columns.tolist()}")
+
     # Step 7: Validate required columns (case-insensitive, excluding OrigRowNum)
     required_columns = [
         "customer", "lat", "lon", "address", "city", "state", "zip",
@@ -47,10 +50,19 @@ def validate_subscriber_file(input_csv, company_id):
     output_columns = ["OrigRowNum"] + required_columns
     
     # Map original column names to standardized lowercase names
-    column_mapping = {col: col.lower() for col in df_inserted.columns if col.lower() in required_columns or col == "OrigRowNum"}
+    column_mapping = {col: col.lower() if col.lower() in required_columns else col 
+                     for col in df_inserted.columns 
+                     if col.lower() in required_columns or col.lower() == "origrownum"}
     
+    # Debugging: Print column_mapping
+    print(f"Column mapping: {column_mapping}")
+
     # Select and reorder columns to match output_columns order
-    cleaned_df = df_inserted[list(column_mapping.keys())].rename(columns=column_mapping)[output_columns]
+    try:
+        cleaned_df = df_inserted[list(column_mapping.keys())].rename(columns=column_mapping)[output_columns]
+    except KeyError as e:
+        print(f"KeyError: {e}. Available columns: {df_inserted.columns.tolist()}")
+        sys.exit(1)
     
     # Save the cleaned DataFrame to original_subscribers_cleantitles.csv
     cleaned_df.to_csv(output_cleantitles_csv, index=False)
