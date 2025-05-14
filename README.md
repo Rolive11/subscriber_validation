@@ -6,7 +6,7 @@ This repository contains tools and documentation for validating subscriber CSV f
 ```mermaid
 graph TD
     A[Start: Using the Terminal from the main_directory, Input the 'original_subscriber.csv' File and 'company_id', using this command line: python3 vs.py 'original_subscriber.csv' 'company_id'] --> B[Create/Overwrite a directory called 'company_id' off of the main directory] 
-    B --> C[Save the 'original_subscribers.csv file in the new directory called 'company_id'] 
+    B --> C[Save the 'original_subscribers.csv' file in the new directory called 'company_id'] 
     C --> D[Create a new csv file called 'original_subscribers_columnA_inserted.csv' and save it to the 'company_id' directory] 
     D --> E[Copy the contents of 'original_subscribers.csv to 'original_subscribers_columnA_inserted.csv']
     E --> F[Open 'original_subscribers_columnA_inserted.csv' and insert a column to the left of column A and save the file]
