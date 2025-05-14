@@ -5,7 +5,7 @@ This repository contains tools and documentation for validating subscriber CSV f
 ## Flowchart for Step 1 Validation
 ```mermaid
 graph TD
-    A[Start: Run python3 vs.py "original_subscriber.csv" "company_id"] --> B[Create directory "company_id"]
+    A[Run python3 vs.py "original_subscriber.csv" "company_id"] --> B[Create directory "company_id"]
     B --> C[Save "original_subscribers.csv" in "company_id"]
     C --> D[Create "original_subscribers_columnA_inserted.csv"]
     D --> E[Copy content to "original_subscribers_columnA_inserted.csv"]
