@@ -1,3 +1,4 @@
+# VS.py - Version 1.0.1
 import pandas as pd
 import os
 import shutil
@@ -37,7 +38,9 @@ def validate_subscriber_file(input_csv, company_id):
     # Step 7: Create cleaned DataFrame with standardized column titles
     output_columns = ["OrigRowNum"] + required_columns
     column_mapping = {col: col.lower() for col in df.columns 
-                     if col.lower() in required_columns or col.lower() == "origrownum"}
+                     if col.lower() in required_columns}
+    # Preserve OrigRowNum as is
+    column_mapping['OrigRowNum'] = 'OrigRowNum'
 
     # Debugging - Print column mapping
     print(f"Column mapping: {column_mapping}")
@@ -49,18 +52,33 @@ def validate_subscriber_file(input_csv, company_id):
         print(f"KeyError: {e}. Available columns: {df.columns.tolist()}")
         sys.exit(1)
 
-    # Step 8: Save the cleaned DataFrame
-    output_cleantitles_csv = os.path.join(company_id, "original_subscribers_cleantitles.csv")
-    cleaned_df.to_csv(output_cleantitles_csv, index=False)
+    # Debugging - Print DataFrame shape
+    print(f"Cleaned DataFrame shape: {cleaned_df.shape} (rows, columns)")
+
+    # Step 8: Save the cleaned DataFrame with modified filename
+    # Extract the base filename without extension
+    base_filename = os.path.splitext(original_filename)[0]
+    output_cleantitles_csv = os.path.join(company_id, f"{base_filename}_Mod_1.csv")
+    try:
+        cleaned_df.to_csv(output_cleantitles_csv, index=False)
+        # Verify file exists
+        if os.path.isfile(output_cleantitles_csv):
+            print(f"Successfully saved: {output_cleantitles_csv}")
+        else:
+            print(f"Error: Failed to save {output_cleantitles_csv}. File does not exist.")
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error saving {output_cleantitles_csv}: {e}")
+        sys.exit(1)
 
     print(f"Processing complete. Files saved in {company_id}/:")
     print(f"- {original_filename} (original copy)")
-    print(f"- original_subscribers_cleantitles.csv (cleaned column titles with OrigRowNum)")
+    print(f"- {base_filename}_Mod_1.csv (cleaned column titles with OrigRowNum)")
 
 if __name__ == "__main__":
     # Check for correct command-line arguments
     if len(sys.argv) != 3:
-        print("Usage: python3 vs.py <input_csv> <company_id>")
+        print("Usage: python3 VS.py <input_csv> <company_id>")
         sys.exit(1)
 
     input_csv = sys.argv[1]
